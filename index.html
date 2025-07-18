@@ -109,167 +109,18 @@
 
     <script src="dados.js"></script>
     <script>
-        // --- SCRIPT CORRIGIDO: Funções reorganizadas e duplicatas removidas ---
-
         let mapa;
-        // CORREÇÃO: Adicionados os parênteses () para criar o grupo de camadas
         let marcadores = L.layerGroup(); 
         let bairrosChart, temasChart, dependenciaChart;
 
         // --- FUNÇÕES DE LÓGICA ---
-
-        const inicializarMapa = () => {
-            mapa = L.map('mapa').setView([-25.4284, -49.2733], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(mapa);
-            marcadores.addTo(mapa);
-        };
-
-        const adicionarMarcadoresAoMapa = (dadosParaMapear) => {
-            marcadores.clearLayers();
-            dadosParaMapear.forEach(item => {
-                if (item.Latitude && item.Longitude) {
-                    const marker = L.marker([item.Latitude, item.Longitude]);
-                    marker.bindPopup(`<b>${item.Nome}</b><br>${item.Equipamento}`);
-                    marcadores.addLayer(marker);
-                }
-            });
-        };
-
-        const contarOcorrencias = (array) => {
-            const contagem = {};
-            array.forEach(item => { contagem[item] = (contagem[item] || 0) + 1; });
-            return contagem;
-        };
-
-        const criarGraficoDeBarras = (canvasId, titulo, dados, chartInstance, tipo = 'bar', cor = '#FFC107') => {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            const itensOrdenados = Object.entries(dados).sort(([,a],[,b]) => b-a);
-            const labels = itensOrdenados.map(item => item[0]);
-            const valores = itensOrdenados.map(item => item[1]);
-            
-            if (canvasId === 'bairrosChart' || canvasId === 'temasChart') {
-                const container = document.getElementById(canvasId + 'Container');
-                if(container) {
-                    container.style.height = `${100 + labels.length * 25}px`;
-                }
-            }
-            if (chartInstance) { chartInstance.destroy(); }
-            const chartConfig = {
-                type: tipo,
-                data: { labels: labels, datasets: [{ label: 'Nº de Equipamentos', data: valores, backgroundColor: cor }] },
-                options: {
-                    maintainAspectRatio: false, responsive: true, indexAxis: 'y', layout: { padding: { right: 35 }},
-                    scales: {
-                        x: { ticks: { color: '#E0E0E0' }, grid: { color: 'rgba(224, 224, 224, 0.1)' } },
-                        y: { ticks: { color: '#E0E0E0' }, grid: { color: 'rgba(224, 224, 224, 0.1)' } }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        title: { display: true, text: titulo, font: { size: 16 }, color: '#FFC107' },
-                        datalabels: { color: '#E0E0E0', anchor: 'end', align: 'end', font: { weight: 'bold' }, formatter: (value) => value > 0 ? value : '' }
-                    }
-                }
-            };
-            if (canvasId === 'bairrosChart') bairrosChart = new Chart(ctx, chartConfig);
-            else if (canvasId === 'temasChart') temasChart = new Chart(ctx, chartConfig);
-        };
-
-        const criarGraficoDePizza = (canvasId, titulo, dados, chartInstance) => {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            const labels = Object.keys(dados);
-            const valores = Object.values(dados);
-            if (chartInstance) { chartInstance.destroy(); }
-            const chartConfig = {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{ data: valores, backgroundColor: ['#FFC107', '#FFA000', '#FF8F00', '#FF6F00'] }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'top', labels: { color: '#E0E0E0' } },
-                        title: { display: true, text: titulo, font: { size: 16 }, color: '#FFC107' },
-                        datalabels: { color: '#121212', font: { weight: 'bold', size: 12 }, formatter: (value, context) => { const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); const percentage = ((value / total) * 100).toFixed(1) + '%'; return `${value}\n(${percentage})`; } }
-                    }
-                }
-            };
-            if (canvasId === 'dependenciaChart') dependenciaChart = new Chart(ctx, chartConfig);
-        };
-        
-        const popularFiltrosRegionais = () => {
-            const filtro = document.getElementById('regionalFilter');
-            const regionais = [...new Set(equipamentos.map(d => d.Regional))].sort();
-            filtro.innerHTML = '<option value="Todos">Todas as Regionais</option>';
-            regionais.forEach(regional => { const option = document.createElement('option'); option.value = regional; option.textContent = regional; filtro.appendChild(option); });
-        };
-        
-        const popularFiltroBairro = () => {
-            const filtro = document.getElementById('bairroFilter');
-            const bairros = [...new Set(equipamentos.map(d => d.Bairro))].sort();
-            filtro.innerHTML = '<option value="">-- Selecione um Bairro --</option>';
-            bairros.forEach(bairro => {
-                const option = document.createElement('option');
-                option.value = bairro;
-                option.textContent = bairro;
-                filtro.appendChild(option);
-            });
-        };
 
         const exibirDetalhesBairro = () => {
             const bairroSelecionado = document.getElementById('bairroFilter').value;
             const containerDetalhes = document.getElementById('detalhesBairroContainer');
             const tituloDetalhes = document.getElementById('detalhesBairroTitulo');
             const containerResultado = document.getElementById('detalhesResultado');
+
             if (!bairroSelecionado) {
                 containerDetalhes.style.display = 'none';
-                adicionarMarcadoresAoMapa(equipamentos.filter(e => e.Regional === document.getElementById('regionalFilter').value || document.getElementById('regionalFilter').value === 'Todos'));
-                return;
-            }
-            containerDetalhes.style.display = 'block';
-            const equipamentosDoBairro = equipamentos.filter(d => d.Bairro === bairroSelecionado).sort((a, b) => a.Nome.localeCompare(b.Nome));
-            adicionarMarcadoresAoMapa(equipamentosDoBairro);
-            tituloDetalhes.innerText = `Detalhes de ${bairroSelecionado}`;
-            let htmlResultado = `<h4 style="text-align:center; color: #E0E0E0;">Total: ${equipamentosDoBairro.length} equipamentos</h4>`;
-            if (equipamentosDoBairro.length === 0) {
-                htmlResultado += '<p>Nenhum equipamento encontrado para este bairro.</p>';
-            } else {
-                 htmlResultado += equipamentosDoBairro.map(item => `
-                    <div class="equipamento-item">
-                        <h3>${item.Nome}</h3>
-                        <p><strong>Tipo:</strong> ${item.Equipamento}</p><p><strong>Endereço:</strong> ${item.Endereço || 'Não informado'}</p><p><strong>Telefone:</strong> ${item.Telefone || 'Não informado'}</p>
-                    </div>
-                `).join('');
-            }
-            containerResultado.innerHTML = htmlResultado;
-        };
-
-        const atualizarDashboard = () => {
-            const filtroRegional = document.getElementById('regionalFilter').value;
-            // Quando atualizamos o dashboard, limpamos o filtro de bairros para evitar confusão
-            document.getElementById('bairroFilter').value = "";
-            exibirDetalhesBairro();
-
-            const dadosFiltrados = filtroRegional === 'Todos' ? equipamentos : equipamentos.filter(d => d.Regional === filtroRegional);
-            adicionarMarcadoresAoMapa(dadosFiltrados);
-            const contagemBairros = contarOcorrencias(dadosFiltrados.map(d => d.Bairro));
-            const contagemTemas = contarOcorrencias(dadosFiltrados.map(d => d.Tema));
-            const contagemDependencia = contarOcorrencias(dadosFiltrados.map(d => d['Dependência Administrativa']));
-            criarGraficoDeBarras('bairrosChart', 'Nº de Equipamentos por Bairro', contagemBairros, bairrosChart);
-            criarGraficoDeBarras('temasChart', 'Equipamentos por Tema', contagemTemas, temasChart, 'bar', '#FFA000');
-            criarGraficoDePizza('dependenciaChart', 'Distribuição por Dependência Administrativa', contagemDependencia, dependenciaChart);
-        };
-
-        // --- INICIALIZAÇÃO DA PÁGINA ---
-        document.addEventListener('DOMContentLoaded', () => {
-            Chart.register(ChartDataLabels);
-            inicializarMapa();
-            popularFiltrosRegionais();
-            popularFiltroBairro();
-            atualizarDashboard();
-        });
-    </script>
-</body>
-</html>
+                adicionarMarcadores
