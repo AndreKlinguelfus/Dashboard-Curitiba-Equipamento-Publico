@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Interativo de Equipamentos Urbanos</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 1200px; margin: auto; overflow: auto; padding: 0 20px; }
+        h1, h2 { text-align: center; color: #0056b3; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; align-items: start; margin-top: 20px; }
+        .card { background: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 5px 10px rgba(0,0,0,0.1); }
+        .filter-container { margin-bottom: 20px; text-align: center; }
+        label { font-weight: bold; margin-right: 10px; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; min-width: 250px; }
+        
+        /* Estilo para o contêiner do mapa */
+        #mapa { height: 500px; width: 100%; border-radius: 5px; margin-top: 20px;}
+
+        #detalhesResultado { margin-top: 20px; }
+        .equipamento-item { border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin-bottom: 10px; background-color: #fafafa; }
+        .equipamento-item h3 { margin-top: 0; color: #333; }
+        .equipamento-item p { margin: 5px 0; }
+
+        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard Interativo de Equipamentos Urbanos de Curitiba</h1>
+
+        <div class="card">
+            <h2>Mapa de Equipamentos</h2>
+            <div id="mapa"></div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card filter-container" style="grid-column: 1 / -1;">
+                <label for="regionalFilter">Filtrar por Regional:</label>
+                <select id="regionalFilter" onchange="atualizarDashboard()"></select>
+            </div>
+            <div class="card" id="bairrosChartContainer"><canvas id="bairrosChart"></canvas></div>
+            <div class="card" id="temasChartContainer"><canvas id="temasChart"></canvas></div>
+            <div class="card"><canvas id="dependenciaChart"></canvas></div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h2>Detalhes por Bairro</h2>
+            <div class="filter-container">
+                <label for="bairroFilter">Selecione um Bairro:</label>
+                <select id="bairroFilter" onchange="exibirDetalhesBairro()"></select>
+            </div>
+            <div id="detalhesResultado"></div>
+        </div>
+    </div>
+
+    <script src="dados.js"></script>
+    <script>
+        let mapa;
+        let marcadores = L.layerGroup();
+        let bairrosChart, temasChart, dependenciaChart;
+
+        // --- FUNÇÕES DO MAPA ---
+        const inicializarMapa = () => {
+            mapa = L.map('mapa').setView([-25.4284, -49.2733], 12); // Centro de Curitiba
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(mapa);
+            marcadores.addTo(mapa);
+        };
+
+        const adicionarMarcadoresAoMapa = (dadosParaMapear) => {
+            marcadores.clearLayers(); // Limpa os marcadores antigos
+            dadosParaMapear.forEach(item => {
+                if (item.Latitude && item.Longitude) {
+                    const marker = L.marker([item.Latitude, item.Longitude]);
+                    marker.bindPopup(`<b>${item.Nome}</b><br>${item.Equipamento}`);
+                    marcadores.addLayer(marker);
+                }
+            });
+        };
+
+        // --- FUNÇÕES DO DASHBOARD ---
+        const atualizarDashboard = () => {
+            const filtroRegional = document.getElementById('regionalFilter').value;
+            const dadosFiltrados = filtroRegional === 'Todos' ? equipamentos : equipamentos.filter(d => d.Regional === filtroRegional);
+            adicionarMarcadoresAoMapa(dadosFiltrados);
+            
+            const contagemBairros = contarOcorrencias(dadosFiltrados.map(d => d.Bairro));
+            const contagemTemas = contarOcorrencias(dadosFiltrados.map(d => d.Tema));
+            const contagemDependencia = contarOcorrencias(dadosFiltrados.map(d => d['Dependência Administrativa']));
+
+            criarGraficoDeBarras('bairrosChart', 'Nº de Equipamentos por Bairro', contagemBairros, bairrosChart);
+            criarGraficoDeBarras('temasChart', 'Equipamentos por Tema', contagemTemas, temasChart, 'bar', 'lightcoral');
+            criarGraficoDePizza('dependenciaChart', 'Distribuição por Dependência Administrativa', contagemDependencia, dependenciaChart);
+        };
+
+        const exibirDetalhesBairro = () => {
+            const bairroSelecionado = document.getElementById('bairroFilter').value;
+            const containerResultado = document.getElementById('detalhesResultado');
+            if (!bairroSelecionado) {
+                containerResultado.innerHTML = '<p style="text-align:center;">Selecione um bairro para ver a lista de equipamentos.</p>';
+                adicionarMarcadoresAoMapa([]); // Limpa o mapa se nenhum bairro for selecionado
+                return;
+            }
+            const equipamentosDoBairro = equipamentos.filter(d => d.Bairro === bairroSelecionado).sort((a, b) => a.Nome.localeCompare(b.Nome));
+            adicionarMarcadoresAoMapa(equipamentosDoBairro); // Adiciona marcadores para o bairro selecionado
+
+            if (equipamentosDoBairro.length === 0) {
+                containerResultado.innerHTML = '<p>Nenhum equipamento encontrado para este bairro.</p>';
+                return;
+            }
+            let htmlResultado = `<h4 style="text-align:center;">Total: ${equipamentosDoBairro.length} equipamentos em ${bairroSelecionado}</h4>`;
+            htmlResultado += equipamentosDoBairro.map(item => `
+                <div class="equipamento-item">
+                    <h3>${item.Nome}</h3>
+                    <p><strong>Tipo:</strong> ${item.Equipamento}</p><p><strong>Endereço:</strong> ${item.Endereço || 'Não informado'}</p><p><strong>Telefone:</strong> ${item.Telefone || 'Não informado'}</p>
+                </div>
+            `).join('');
+            containerResultado.innerHTML = htmlResultado;
+        };
+        
+        // --- FUNÇÕES DE APOIO (GRÁFICOS E FILTROS) ---
+        const contarOcorrencias = (array) => { const contagem = {}; array.forEach(item => { contagem[item] = (contagem[item] || 0) + 1; }); return contagem; };
+        const criarGraficoDeBarras = (canvasId, titulo, dados, chartInstance, tipo = 'bar', cor = 'skyblue') => { const ctx = document.getElementById(canvasId).getContext('2d'); const itensOrdenados = Object.entries(dados).sort(([,a],[,b]) => b-a); const dadosParaGrafico = itensOrdenados; const labels = dadosParaGrafico.map(item => item[0]); const valores = dadosParaGrafico.map(item => item[1]); if (canvasId === 'bairrosChart' || canvasId === 'temasChart') { const containerId = canvasId + 'Container'; const container = document.getElementById(containerId); if(container) { const novaAltura = 100 + labels.length * 25; container.style.height = `${novaAltura}px`; } } if (chartInstance) { chartInstance.destroy(); } const chartConfig = { type: tipo, data: { labels: labels, datasets: [{ label: 'Nº de Equipamentos', data: valores, backgroundColor: cor }] }, options: { maintainAspectRatio: false, responsive: true, indexAxis: 'y', layout: {}, plugins: { legend: { display: false }, title: { display: true, text: titulo, font: { size: 16 } }, datalabels: { color: '#363636', anchor: 'end', align: 'end', formatter: (value) => value > 0 ? value : '', font: { weight: 'bold' } } } } }; if (canvasId === 'bairrosChart') { chartConfig.options.layout.padding = { right: 35 }; } if (canvasId === 'bairrosChart') bairrosChart = new Chart(ctx, chartConfig); else if (canvasId === 'temasChart') temasChart = new Chart(ctx, chartConfig); };
+        const criarGraficoDePizza = (canvasId, titulo, dados, chartInstance) => { const ctx = document.getElementById(canvasId).getContext('2d'); const labels = Object.keys(dados); const valores = Object.values(dados); if (chartInstance) { chartInstance.destroy(); } const chartConfig = { type: 'doughnut', data: { labels: labels, datasets: [{ data: valores, backgroundColor: ['#36a2eb', '#ff6384', '#ffce56', '#4bc0c0', '#9966ff'] }] }, options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: titulo, font: { size: 16 } }, datalabels: { color: '#fff', formatter: (value, context) => { const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); const percentage = ((value / total) * 100).toFixed(1) + '%'; return `${value}\n(${percentage})`; }, font: { weight: 'bold', size: 12 } } } } }; if (canvasId === 'dependenciaChart') dependenciaChart = new Chart(ctx, chartConfig); };
+        const popularFiltrosRegionais = () => { const filtro = document.getElementById('regionalFilter'); const regionais = [...new Set(equipamentos.map(d => d.Regional))].sort(); filtro.innerHTML = '<option value="Todos">Todas as Regionais</option>'; regionais.forEach(regional => { const option = document.createElement('option'); option.value = regional; option.textContent = regional; filtro.appendChild(option); }); };
+        const popularFiltroBairro = () => { const filtro = document.getElementById('bairroFilter'); const bairros = [...new Set(equipamentos.map(d => d.Bairro))].sort(); filtro.innerHTML = '<option value="">-- Selecione um Bairro --</option>'; bairros.forEach(bairro => { const option = document.createElement('option'); option.value = bairro; option.textContent = bairro; filtro.appendChild(option); }); };
+
+        // --- INICIALIZAÇÃO DA PÁGINA ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const temasCanvas = document.getElementById('temasChart');
+            if (temasCanvas && temasCanvas.parentElement) temasCanvas.parentElement.id = 'temasChartContainer';
+            
+            Chart.register(ChartDataLabels);
+            
+            inicializarMapa(); // Cria o mapa
+            popularFiltrosRegionais();
+            atualizarDashboard(); // Popula o mapa e os gráficos iniciais
+            popularFiltroBairro();
+            exibirDetalhesBairro(); 
+        });
+    </script>
+</body>
+</html>
