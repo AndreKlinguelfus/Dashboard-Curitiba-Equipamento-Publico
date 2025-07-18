@@ -7,79 +7,34 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     
     <style>
-        body { 
-            font-family: sans-serif; 
-            line-height: 1.6; 
-            margin: 0; 
-            padding: 20px; 
-            background-color: #121212; 
-            color: #E0E0E0; 
-        }
+        body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #121212; color: #E0E0E0; }
         .container { max-width: 1200px; margin: auto; overflow: auto; padding: 0 20px; }
-        h1, h2 { 
-            text-align: center; 
-            color: #FFC107; 
-        }
-        .card { 
-            background: #1E1E1E; 
-            padding: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            border: 1px solid #333;
-        }
-        .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .dashboard-grid { 
-            display: grid; 
-            grid-template-columns: repeat(2, 1fr); 
-            gap: 20px; 
-            align-items: start; 
-            margin-top: 20px; 
-        }
+        h1, h2 { text-align: center; color: #FFC107; }
+        .card { background: #1E1E1E; padding: 20px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border: 1px solid #333; }
+        .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; align-items: start; margin-top: 20px; }
         .filter-container { text-align: center; padding-bottom: 10px; }
         label { font-weight: bold; margin-right: 10px; color: #FFC107; }
-        select { 
-            padding: 10px; 
-            border-radius: 4px; 
-            border: 1px solid #555; 
-            background-color: #333;
-            color: #E0E0E0;
-            min-width: 250px; 
-        }
-        #mapa { height: 500px; width: 100%; border-radius: 5px; margin-top: 20px;}
+        select { padding: 10px; border-radius: 4px; border: 1px solid #555; background-color: #333; color: #E0E0E0; min-width: 250px; }
+        #mapa { height: 500px; width: 100%; border-radius: 5px; margin-top: 20px; }
         #detalhesResultado { margin-top: 20px; max-height: 400px; overflow-y: auto; }
-        .equipamento-item { 
-            border: 1px solid #444; 
-            border-radius: 4px; 
-            padding: 15px; 
-            margin-bottom: 10px; 
-            background-color: #282828; 
-        }
+        .equipamento-item { border: 1px solid #444; border-radius: 4px; padding: 15px; margin-bottom: 10px; background-color: #282828; }
         .equipamento-item h3 { margin-top: 0; color: #FFC107; }
         .equipamento-item p { margin: 5px 0; }
-        @media (max-width: 768px) { 
-            .dashboard-grid, .filters-grid { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 768px) { .dashboard-grid, .filters-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Dashboard Interativo de Equipamentos Urbanos</h1>
-
         <div class="card">
             <h2>Mapa de Equipamentos</h2>
             <div id="mapa"></div>
         </div>
-
         <div class="filters-grid">
             <div class="card">
                 <div class="filter-container">
@@ -94,12 +49,10 @@
                 </div>
             </div>
         </div>
-        
         <div class="card" id="detalhesBairroContainer" style="margin-top: 20px; display: none;">
             <h2 id="detalhesBairroTitulo"></h2>
             <div id="detalhesResultado"></div>
         </div>
-
         <div class="dashboard-grid">
             <div class="card" id="bairrosChartContainer"><canvas id="bairrosChart"></canvas></div>
             <div class="card" id="temasChartContainer"><canvas id="temasChart"></canvas></div>
@@ -109,24 +62,23 @@
 
     <script src="dados.js"></script>
     <script>
-        // --- SCRIPT CORRIGIDO: Funções reorganizadas e duplicatas removidas ---
+        // --- SCRIPT CORRIGIDO E REORGANIZADO ---
 
         let mapa;
-        // CORREÇÃO: Adicionados os parênteses () para criar o grupo de camadas
         let marcadores = L.layerGroup(); 
         let bairrosChart, temasChart, dependenciaChart;
 
-        // --- FUNÇÕES DE LÓGICA ---
+        // --- FUNÇÕES DE LÓGICA E VISUALIZAÇÃO ---
 
-        const inicializarMapa = () => {
+        function inicializarMapa() {
             mapa = L.map('mapa').setView([-25.4284, -49.2733], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(mapa);
             marcadores.addTo(mapa);
-        };
+        }
 
-        const adicionarMarcadoresAoMapa = (dadosParaMapear) => {
+        function adicionarMarcadoresAoMapa(dadosParaMapear) {
             marcadores.clearLayers();
             dadosParaMapear.forEach(item => {
                 if (item.Latitude && item.Longitude) {
@@ -135,27 +87,27 @@
                     marcadores.addLayer(marker);
                 }
             });
-        };
+        }
 
-        const contarOcorrencias = (array) => {
+        function contarOcorrencias(array) {
             const contagem = {};
             array.forEach(item => { contagem[item] = (contagem[item] || 0) + 1; });
             return contagem;
-        };
+        }
 
-        const criarGraficoDeBarras = (canvasId, titulo, dados, chartInstance, tipo = 'bar', cor = '#FFC107') => {
+        function criarGraficoDeBarras(canvasId, titulo, dados, chartInstance, tipo = 'bar', cor = '#FFC107') {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const itensOrdenados = Object.entries(dados).sort(([,a],[,b]) => b-a);
             const labels = itensOrdenados.map(item => item[0]);
             const valores = itensOrdenados.map(item => item[1]);
             
-            if (canvasId === 'bairrosChart' || canvasId === 'temasChart') {
-                const container = document.getElementById(canvasId + 'Container');
-                if(container) {
-                    container.style.height = `${100 + labels.length * 25}px`;
-                }
+            const container = document.getElementById(canvasId + 'Container');
+            if(container) {
+                container.style.height = `${100 + labels.length * 25}px`;
             }
+            
             if (chartInstance) { chartInstance.destroy(); }
+
             const chartConfig = {
                 type: tipo,
                 data: { labels: labels, datasets: [{ label: 'Nº de Equipamentos', data: valores, backgroundColor: cor }] },
@@ -174,9 +126,9 @@
             };
             if (canvasId === 'bairrosChart') bairrosChart = new Chart(ctx, chartConfig);
             else if (canvasId === 'temasChart') temasChart = new Chart(ctx, chartConfig);
-        };
+        }
 
-        const criarGraficoDePizza = (canvasId, titulo, dados, chartInstance) => {
+        function criarGraficoDePizza(canvasId, titulo, dados, chartInstance) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const labels = Object.keys(dados);
             const valores = Object.values(dados);
@@ -197,16 +149,16 @@
                 }
             };
             if (canvasId === 'dependenciaChart') dependenciaChart = new Chart(ctx, chartConfig);
-        };
+        }
         
-        const popularFiltrosRegionais = () => {
+        function popularFiltrosRegionais() {
             const filtro = document.getElementById('regionalFilter');
             const regionais = [...new Set(equipamentos.map(d => d.Regional))].sort();
             filtro.innerHTML = '<option value="Todos">Todas as Regionais</option>';
             regionais.forEach(regional => { const option = document.createElement('option'); option.value = regional; option.textContent = regional; filtro.appendChild(option); });
-        };
+        }
         
-        const popularFiltroBairro = () => {
+        function popularFiltroBairro() {
             const filtro = document.getElementById('bairroFilter');
             const bairros = [...new Set(equipamentos.map(d => d.Bairro))].sort();
             filtro.innerHTML = '<option value="">-- Selecione um Bairro --</option>';
@@ -216,51 +168,59 @@
                 option.textContent = bairro;
                 filtro.appendChild(option);
             });
-        };
-
-        const exibirDetalhesBairro = () => {
+        }
+        
+        function exibirDetalhesBairro() {
             const bairroSelecionado = document.getElementById('bairroFilter').value;
             const containerDetalhes = document.getElementById('detalhesBairroContainer');
             const tituloDetalhes = document.getElementById('detalhesBairroTitulo');
             const containerResultado = document.getElementById('detalhesResultado');
+
             if (!bairroSelecionado) {
                 containerDetalhes.style.display = 'none';
                 adicionarMarcadoresAoMapa(equipamentos.filter(e => e.Regional === document.getElementById('regionalFilter').value || document.getElementById('regionalFilter').value === 'Todos'));
                 return;
             }
             containerDetalhes.style.display = 'block';
+            
             const equipamentosDoBairro = equipamentos.filter(d => d.Bairro === bairroSelecionado).sort((a, b) => a.Nome.localeCompare(b.Nome));
             adicionarMarcadoresAoMapa(equipamentosDoBairro);
+            
             tituloDetalhes.innerText = `Detalhes de ${bairroSelecionado}`;
             let htmlResultado = `<h4 style="text-align:center; color: #E0E0E0;">Total: ${equipamentosDoBairro.length} equipamentos</h4>`;
+
             if (equipamentosDoBairro.length === 0) {
                 htmlResultado += '<p>Nenhum equipamento encontrado para este bairro.</p>';
             } else {
                  htmlResultado += equipamentosDoBairro.map(item => `
                     <div class="equipamento-item">
                         <h3>${item.Nome}</h3>
-                        <p><strong>Tipo:</strong> ${item.Equipamento}</p><p><strong>Endereço:</strong> ${item.Endereço || 'Não informado'}</p><p><strong>Telefone:</strong> ${item.Telefone || 'Não informado'}</p>
+                        <p><strong>Tipo:</strong> ${item.Equipamento}</p>
+                        <p><strong>Dependência:</strong> ${item['Dependência Administrativa'] || 'Não informada'}</p>
+                        <p><strong>Endereço:</strong> ${item.Endereço || 'Não informado'}</p>
+                        <p><strong>Telefone:</strong> ${item.Telefone || 'Não informado'}</p>
                     </div>
                 `).join('');
             }
             containerResultado.innerHTML = htmlResultado;
-        };
+        }
 
-        const atualizarDashboard = () => {
+        function atualizarDashboard() {
             const filtroRegional = document.getElementById('regionalFilter').value;
-            // Quando atualizamos o dashboard, limpamos o filtro de bairros para evitar confusão
             document.getElementById('bairroFilter').value = "";
             exibirDetalhesBairro();
 
             const dadosFiltrados = filtroRegional === 'Todos' ? equipamentos : equipamentos.filter(d => d.Regional === filtroRegional);
             adicionarMarcadoresAoMapa(dadosFiltrados);
+
             const contagemBairros = contarOcorrencias(dadosFiltrados.map(d => d.Bairro));
             const contagemTemas = contarOcorrencias(dadosFiltrados.map(d => d.Tema));
             const contagemDependencia = contarOcorrencias(dadosFiltrados.map(d => d['Dependência Administrativa']));
+            
             criarGraficoDeBarras('bairrosChart', 'Nº de Equipamentos por Bairro', contagemBairros, bairrosChart);
             criarGraficoDeBarras('temasChart', 'Equipamentos por Tema', contagemTemas, temasChart, 'bar', '#FFA000');
             criarGraficoDePizza('dependenciaChart', 'Distribuição por Dependência Administrativa', contagemDependencia, dependenciaChart);
-        };
+        }
 
         // --- INICIALIZAÇÃO DA PÁGINA ---
         document.addEventListener('DOMContentLoaded', () => {
